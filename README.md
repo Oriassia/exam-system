@@ -1,10 +1,12 @@
-# Auto-Graded Exam Base Project
+# Exam System
 
 A minimal full-stack application for managing and submitting open-ended exam questions. This project serves as a foundation for a live interview.
 
 ## Features
 
-- **Backend (Flask + MongoDB)**
+- **Backend Options**
+  - **Python Flask** (`python/server/`) - Flask + MongoDB
+  - **Node.js Express** (`nodejs/server/`) - Express + MongoDB
   - Fetch exam questions from MongoDB
   - Submit student answers
 - **Frontend (React + Vite)**
@@ -15,30 +17,51 @@ A minimal full-stack application for managing and submitting open-ended exam que
 ## Tech Stack
 
 - **Frontend**: React 18, Vite, Axios
-- **Backend**: Python 3, Flask, PyMongo
-- **Database**: MongoDB (local instance)
+- **Backend Options**:
+  - **Python**: Python 3, Flask, PyMongo
+  - **Node.js**: Node.js 16+, Express, MongoDB Driver
+- **Database**: MongoDB **(local instance)**
 
 ## Project Structure
 
 ```
-StudyWiseInterview/
-├── client/                 # React frontend
-│   ├── src/
-│   │   ├── api/           # API integration
-│   │   ├── components/    # React components
-│   │   ├── pages/         # Page components
-│   │   └── styles/        # CSS files
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
-├── server/                # Flask backend
-│   ├── db/
-│   │   └── database.py    # MongoDB connection & initialization
-│   ├── routes/
-│   │   ├── questions.py   # GET /questions endpoint
-│   │   └── submissions.py # POST /submit endpoint
-│   ├── app.py             # Flask app entry point
-│   └── requirements.txt
+exam-system/
+├── python/
+│   ├── client/                 # React frontend (Python version)
+│   │   ├── src/
+│   │   │   ├── api/           # API integration
+│   │   │   ├── components/    # React components
+│   │   │   ├── pages/         # Page components
+│   │   │   └── styles/        # CSS files
+│   │   ├── index.html
+│   │   ├── package.json
+│   │   └── vite.config.js
+│   └── server/                # Flask backend
+│       ├── db/
+│       │   └── database.py    # MongoDB connection & initialization
+│       ├── routes/
+│       │   ├── questions.py   # GET /questions endpoint
+│       │   └── submissions.py # POST /submit endpoint
+│       ├── app.py             # Flask app entry point
+│       └── requirements.txt
+├── nodejs/
+│   ├── client/                 # React frontend (Node.js version)
+│   │   ├── src/
+│   │   │   ├── api/           # API integration
+│   │   │   ├── components/    # React components
+│   │   │   ├── pages/         # Page components
+│   │   │   └── styles/        # CSS files
+│   │   ├── index.html
+│   │   ├── package.json
+│   │   └── vite.config.js
+│   └── server/                # Express backend
+│       ├── db/
+│       │   └── database.js    # MongoDB connection & initialization
+│       ├── routes/
+│       │   ├── questions.js   # GET /questions endpoint
+│       │   └── submissions.js # POST /submit endpoint
+│       ├── app.js             # Express app entry point
+│       └── package.json
 └── README.md
 ```
 
@@ -47,7 +70,7 @@ StudyWiseInterview/
 Before running this project, make sure you have installed:
 
 - **Node.js** (v16 or higher) and npm
-- **Python** (v3.8 or higher) and pip
+- **Python** (v3.8 or higher) and pip (if using Python backend)
 - **MongoDB** (v4.4 or higher)
 
 ### Installing MongoDB
@@ -82,18 +105,24 @@ mongosh
 
 ## Setup Instructions
 
-### 1. Clone the Repository
+### Choose Your Backend Stack
+
+This project supports two backend implementations:
+
+- **Python Flask** (`python/server/`) - Recommended for Python developers
+- **Node.js Express** (`nodejs/server/`) - Recommended for JavaScript/Node.js developers
+
+Both backends provide the same API endpoints and functionality. Choose the one that best fits your development environment.
+
+---
+
+## Option 1: Python Flask Backend
+
+### 1. Backend Setup
 
 ```bash
-git clone <repository-url>
-cd StudyWiseInterview
-```
-
-### 2. Backend Setup
-
-```bash
-# Navigate to server directory
-cd server
+# Navigate to Python server directory
+cd python/server
 
 # Create a virtual environment (recommended)
 python -m venv venv
@@ -107,11 +136,10 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Create .env file (if not exists)
-# Copy the contents below or use .env.example
+# Create .env file
 ```
 
-Create a `server/.env` file with:
+Create a `python/server/.env` file with:
 
 ```env
 MONGODB_URI=mongodb://localhost:27017/
@@ -119,71 +147,97 @@ DB_NAME=exam_system
 PORT=5000
 ```
 
-### 3. Frontend Setup
+### 2. Frontend Setup
 
 ```bash
-# Navigate to client directory (from project root)
-cd client
+# Navigate to Python client directory (from project root)
+cd python/client
 
 # Install dependencies
 npm install
 ```
 
-## Running the Application
+### 3. Running the Application
 
-### 1. Start MongoDB
-
-Make sure MongoDB is running on your system:
+**Terminal 1 - Backend:**
 
 ```bash
-# Check if MongoDB is running
-mongosh
-
-# If not running, start it:
-# Windows: Should be running as a service
-# macOS: brew services start mongodb-community
-# Linux: sudo systemctl start mongodb
-```
-
-### 2. Start the Backend Server
-
-```bash
-# From the server directory
-cd server
-
-# Activate virtual environment if not already active
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-
-# Run the Flask app
+cd python/server
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Mac/Linux
 python app.py
 ```
 
-The backend will start on `http://localhost:5000`
+✅ Backend running on http://localhost:5000
 
-You should see output indicating:
-
-- MongoDB connection successful
-- Sample questions inserted (first run only)
-- Flask server running
-
-### 3. Start the Frontend
-
-In a new terminal:
+**Terminal 2 - Frontend:**
 
 ```bash
-# From the client directory
-cd client
-
-# Start the Vite dev server
+cd python/client
 npm run dev
 ```
 
-The frontend will start on `http://localhost:3000`
+✅ Frontend running on http://localhost:3000
 
-### 4. Access the Application
+---
+
+## Option 2: Node.js Express Backend
+
+### 1. Backend Setup
+
+```bash
+# Navigate to Node.js server directory
+cd nodejs/server
+
+# Install dependencies
+npm install
+
+# Create .env file
+```
+
+Create a `nodejs/server/.env` file with:
+
+```env
+MONGODB_URI=mongodb://localhost:27017/
+DB_NAME=exam_system
+PORT=5000
+```
+
+### 2. Frontend Setup
+
+```bash
+# Navigate to Node.js client directory (from project root)
+cd nodejs/client
+
+# Install dependencies
+npm install
+```
+
+### 3. Running the Application
+
+**Terminal 1 - Backend:**
+
+```bash
+cd nodejs/server
+npm start
+# Or for development with auto-reload:
+npm run dev
+```
+
+✅ Backend running on http://localhost:5000
+
+**Terminal 2 - Frontend:**
+
+```bash
+cd nodejs/client
+npm run dev
+```
+
+✅ Frontend running on http://localhost:3000
+
+---
+
+## Access the Application
 
 Open your browser and navigate to:
 
@@ -197,17 +251,6 @@ http://localhost:3000
 2. **Answer Questions**: Each question has a text area for your answer
 3. **Submit**: Click "Submit Exam" to submit all answers
 4. **Confirmation**: A success message will appear upon successful submission
-
-
-## Sample Questions
-
-The application comes pre-loaded with 5 computer science questions:
-
-1. Polymorphism in OOP
-2. SQL vs NoSQL databases
-3. HTTP protocol and request methods
-4. Version control systems (Git)
-5. Big O notation and algorithm analysis
 
 ## Troubleshooting
 
@@ -233,12 +276,12 @@ The application comes pre-loaded with 5 computer science questions:
 
 ### CORS Issues
 
-The backend has CORS enabled for all origins. If you encounter CORS errors:
+Both backends have CORS enabled for all origins. If you encounter CORS errors:
 
 - Ensure both frontend and backend are running
 - Check browser console for specific error messages
 
-### Python Dependencies
+### Python Dependencies (Flask Backend)
 
 If you encounter import errors:
 
@@ -247,9 +290,30 @@ pip install --upgrade pip
 pip install -r requirements.txt --force-reinstall
 ```
 
+### Node.js Dependencies (Express Backend)
+
+If you encounter module errors:
+
+```bash
+cd nodejs/server
+rm -rf node_modules package-lock.json
+npm install
+```
+
 ## Development Notes
 
-- The backend automatically initializes sample questions on first run
+- Both backends automatically initialize sample questions on first run
 - Submissions are stored with timestamps for future reference
 - No authentication is required (suitable for local development)
+- Both implementations use the same MongoDB database (`exam_system`)
+- The client-side code is identical for both versions
 
+## Quick Start Comparison
+
+| Task           | Python Flask                                          | Node.js Express                   |
+| -------------- | ----------------------------------------------------- | --------------------------------- |
+| Backend Setup  | `cd python/server && pip install -r requirements.txt` | `cd nodejs/server && npm install` |
+| Frontend Setup | `cd python/client && npm install`                     | `cd nodejs/client && npm install` |
+| Run Backend    | `python app.py`                                       | `npm start`                       |
+| Run Frontend   | `npm run dev`                                         | `npm run dev`                     |
+| Ports          | Backend: 5000, Frontend: 3000                         | Backend: 5000, Frontend: 3000     |
