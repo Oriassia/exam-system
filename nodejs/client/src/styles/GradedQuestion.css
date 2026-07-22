@@ -1,0 +1,62 @@
+.graded-question .question-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.score-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: white;
+}
+
+.score-badge.score-high {
+  background-color: #4caf50;
+}
+
+.score-badge.score-mid {
+  background-color: #ff9800;
+}
+
+.score-badge.score-low {
+  background-color: #f44336;
+}
+
+.answer-readonly,
+.feedback-box {
+  margin-top: 15px;
+  padding: 12px;
+  border-radius: 4px;
+}
+
+.answer-readonly {
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+}
+
+.feedback-box {
+  background-color: #eef3fc;
+  border: 1px solid #cddcf2;
+}
+
+.answer-readonly-label,
+.feedback-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.answer-readonly-text,
+.feedback-text {
+  margin: 0;
+  color: #333;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}

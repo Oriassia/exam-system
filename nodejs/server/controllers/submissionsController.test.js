@@ -18,15 +18,22 @@ function fakeRes() {
   };
 }
 
-function fakeSubmissionService(resultOrError) {
+function fakeSubmissionService(resultOrError, getByStudentIdResultOrError) {
   const calls = [];
+  const getByStudentIdCalls = [];
   return {
     submit: async (args) => {
       calls.push(args);
       if (resultOrError instanceof Error) throw resultOrError;
       return resultOrError;
     },
-    calls
+    getByStudentId: async (studentId) => {
+      getByStudentIdCalls.push(studentId);
+      if (getByStudentIdResultOrError instanceof Error) throw getByStudentIdResultOrError;
+      return getByStudentIdResultOrError;
+    },
+    calls,
+    getByStudentIdCalls
   };
 }
 

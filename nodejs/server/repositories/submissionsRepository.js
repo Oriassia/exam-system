@@ -11,5 +11,11 @@ export const submissionsRepository = {
     const submissionsCollection = db.collection('submissions');
     const result = await submissionsCollection.insertOne(submission);
     return { insertedId: result.insertedId };
+  },
+
+  async findByStudentId(studentId) {
+    const db = await getDb();
+    const submissionsCollection = db.collection('submissions');
+    return submissionsCollection.find({ studentId }).sort({ submittedAt: -1 }).toArray();
   }
 };

@@ -21,13 +21,14 @@ function fakeQuestionsRepository(result = questions) {
   return { findByIds: async () => result };
 }
 
-function fakeSubmissionsRepository(insertedIdValue = 'submission-id-1') {
+function fakeSubmissionsRepository(insertedIdValue = 'submission-id-1', existingSubmissions = []) {
   const savedDocs = [];
   return {
     save: async (doc) => {
       savedDocs.push(doc);
       return { insertedId: fakeInsertedId(insertedIdValue) };
     },
+    findByStudentId: async () => existingSubmissions,
     savedDocs
   };
 }
@@ -107,4 +108,34 @@ test('on grading failure, saves the raw answers as grading_failed then throws a 
   assert.equal(saved.status, 'grading_failed');
   assert.equal(saved.studentId, studentId);
   assert.deepEqual(saved.answers, answers);
+});
+
+test('returns a student\'s submissions, newest first, with ids converted to strings', async () => {
+  const existingSubmissions = [
+    { _id: fakeInsertedId('sub-2'), studentId, overallScore: 90, status: 'graded', submittedAt: new Date('2024-02-01') },
+    { _id: fakeInsertedId('sub-1'), studentId, overallScore: 70, status: 'graded', submittedAt: new Date('2024-01-01') }
+  ];
+  const questionsRepository = fakeQuestionsRepository();
+  const submissionsRepository = fakeSubmissionsRepository('unused', existingSubmissions);
+  const gradingService = fakeGradingService({ answers: [], overallScore: 0 });
+  const service = createSubmissionService({ questionsRepository, submissionsRepository, gradingService });
+
+  const result = await service.getByStudentId(studentId);
+
+  assert.equal(result.length, 2);
+  assert.equal(result[0].id, 'sub-2');
+  assert.equal(result[0].overallScore, 90);
+  assert.equal(result[1].id, 'sub-1');
+  assert.equal(result[0]._id, undefined);
+});
+
+test('returns an empty array when a student has no submissions', async () => {
+  const questionsRepository = fakeQuestionsRepository();
+  const submissionsRepository = fakeSubmissionsRepository('unused', []);
+  const gradingService = fakeGradingService({ answers: [], overallScore: 0 });
+  const service = createSubmissionService({ questionsRepository, submissionsRepository, gradingService });
+
+  const result = await service.getByStudentId(studentId);
+
+  assert.deepEqual(result, []);
 });

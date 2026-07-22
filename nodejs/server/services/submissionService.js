@@ -41,5 +41,11 @@ export function createSubmissionService({ questionsRepository, submissionsReposi
     return { submissionId: insertedId.toString(), submission };
   }
 
-  return { submit };
+  async function getByStudentId(studentId) {
+    const submissions = await submissionsRepository.findByStudentId(studentId);
+
+    return submissions.map(({ _id, ...rest }) => ({ id: _id.toString(), ...rest }));
+  }
+
+  return { submit, getByStudentId };
 }

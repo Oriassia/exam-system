@@ -38,7 +38,7 @@ test('passes questionText/rubric/answer for each matched question to the LLM cli
   ]);
 });
 
-test('maps LLM results back onto each answer with score and feedback', async () => {
+test('maps LLM results back onto each answer, converting the 0-100 quality score into points out of an equal share of 100', async () => {
   const llmClient = fakeLlmClient([
     { questionId: 1, score: 90, feedback: 'Good.' },
     { questionId: 2, score: 80, feedback: 'Fine.' }
@@ -48,21 +48,37 @@ test('maps LLM results back onto each answer with score and feedback', async () 
   const graded = await service.gradeSubmission({ answers, questions });
 
   assert.deepEqual(graded.answers, [
-    { questionId: 1, answer: 'A key-value store.', score: 90, feedback: 'Good.' },
-    { questionId: 2, answer: 'LIFO structure.', score: 80, feedback: 'Fine.' }
+    { questionId: 1, answer: 'A key-value store.', score: 45, maxScore: 50, feedback: 'Good.' },
+    { questionId: 2, answer: 'LIFO structure.', score: 40, maxScore: 50, feedback: 'Fine.' }
   ]);
 });
 
-test('computes overallScore as the average of per-question scores, rounded to 1 decimal', async () => {
+test('computes overallScore as the sum of per-question points, which reaches 100 when every question is perfect', async () => {
   const llmClient = fakeLlmClient([
-    { questionId: 1, score: 85, feedback: 'Good.' },
-    { questionId: 2, score: 60, feedback: 'OK.' }
+    { questionId: 1, score: 100, feedback: 'Good.' },
+    { questionId: 2, score: 100, feedback: 'OK.' }
   ]);
   const service = createGradingService({ llmClient });
 
   const graded = await service.gradeSubmission({ answers, questions });
 
-  assert.equal(graded.overallScore, 72.5);
+  assert.equal(graded.overallScore, 100);
+});
+
+test('splits the 100 points evenly across however many questions are graded', async () => {
+  const threeQuestions = [...questions, { id: 3, text: 'What is a queue?', rubric: 'Mentions FIFO' }];
+  const threeAnswers = [...answers, { questionId: 3, answer: 'FIFO structure.' }];
+  const llmClient = fakeLlmClient([
+    { questionId: 1, score: 100, feedback: 'Good.' },
+    { questionId: 2, score: 100, feedback: 'Good.' },
+    { questionId: 3, score: 100, feedback: 'Good.' }
+  ]);
+  const service = createGradingService({ llmClient });
+
+  const graded = await service.gradeSubmission({ answers: threeAnswers, questions: threeQuestions });
+
+  assert.deepEqual(graded.answers.map((a) => a.maxScore), [33.3, 33.3, 33.3]);
+  assert.equal(graded.overallScore, 100);
 });
 
 test('ignores answers whose questionId has no matching question', async () => {

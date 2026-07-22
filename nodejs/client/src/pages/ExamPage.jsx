@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import QuestionList from "../components/QuestionList";
 import SubmitButton from "../components/SubmitButton";
+import ResultsView from "../components/ResultsView";
 import { fetchQuestions, submitAnswers } from "../api/examApi";
 import "../styles/ExamPage.css";
 
@@ -10,7 +11,7 @@ function ExamPage() {
   const [studentId, setStudentId] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -62,15 +63,31 @@ function ExamPage() {
 
     try {
       setSubmitting(true);
-      await submitAnswers(studentId, answersArray);
-      setSubmitted(true);
-      setTimeout(() => setSubmitted(false), 3000);
+      setError(null);
+      const response = await submitAnswers(studentId, answersArray);
+      setResult(response.submission);
     } catch (err) {
-      setError("Failed to submit answers. Please try again.");
+      const data = err.response?.data;
+      if (data?.code === "VALIDATION_ERROR") {
+        setError(data.error);
+      } else if (data?.code === "GRADING_FAILED") {
+        setError(
+          `Your answers were saved, but automatic grading failed. Reference ID: ${data.submissionId}. Please contact support.`
+        );
+      } else {
+        setError("Failed to submit answers. Please try again.");
+      }
       console.error(err);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleRetake = () => {
+    setResult(null);
+    setStudentId("");
+    setError(null);
+    loadQuestions();
   };
 
   if (loading) {
@@ -79,6 +96,23 @@ function ExamPage() {
 
   if (error && questions.length === 0) {
     return <div className="error">{error}</div>;
+  }
+
+  if (result) {
+    return (
+      <div className="exam-page">
+        <header className="exam-header">
+          <h1>Auto-Graded Exam System</h1>
+          <p>Your exam has been graded</p>
+        </header>
+
+        <ResultsView
+          result={result}
+          questions={questions}
+          onRetake={handleRetake}
+        />
+      </div>
+    );
   }
 
   return (
@@ -112,10 +146,6 @@ function ExamPage() {
         disabled={submitting || !studentId.trim()}
         submitting={submitting}
       />
-
-      {submitted && (
-        <div className="success-message">✓ Submitted successfully!</div>
-      )}
 
       {error && questions.length > 0 && (
         <div className="error-message">{error}</div>

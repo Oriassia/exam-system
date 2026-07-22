@@ -30,8 +30,9 @@ export function createAzureOpenAiClient({ config, fetchImpl = fetch }) {
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: buildUserMessage(items) }
         ],
-        response_format: { type: 'json_object' },
-        temperature: 0
+        response_format: { type: 'json_object' }
+        // temperature intentionally omitted: some deployed models (e.g. gpt-5-nano)
+        // only support the default value (1) and reject an explicit temperature: 0.
       })
     });
 
