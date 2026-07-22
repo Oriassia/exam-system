@@ -1,28 +1,16 @@
 import express from 'express';
-import { getDb } from '../db/database.js';
+import { createQuestionsController } from '../controllers/questionsController.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
 
-const router = express.Router();
+/**
+ * Route wiring only - no Mongo or business logic here. The controller
+ * and its dependencies are composed in app.js.
+ */
+export function createQuestionsRouter({ questionsRepository }) {
+  const router = express.Router();
+  const controller = createQuestionsController({ questionsRepository });
 
-router.get('/questions', async (req, res) => {
-    /** Fetch all exam questions */
-    try {
-        const db = await getDb();
-        const questionsCollection = db.collection('questions');
+  router.get('/questions', asyncHandler(controller.getQuestions));
 
-        // Fetch all questions, excluding MongoDB's _id field
-        const questions = await questionsCollection.find({}).project({ _id: 0 }).toArray();
-
-        res.status(200).json({
-            success: true,
-            questions: questions
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-export default router;
-
+  return router;
+}
