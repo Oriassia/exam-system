@@ -48,7 +48,7 @@ function scoreFromEvaluations(criteria, evaluations) {
   return satisfiedCount / criteria.length;
 }
 
-export async function gradeSubmission({ answers, questions, llmClient = { gradeAnswers } }) {
+export async function gradeSubmission({ answers, questions }) {
   const questionById = new Map(questions.map((q) => [q.id, q]));
 
   const items = answers
@@ -63,11 +63,11 @@ export async function gradeSubmission({ answers, questions, llmClient = { gradeA
       };
     });
 
-  const results = await llmClient.gradeAnswers(items);
+  const results = await gradeAnswers(items);
   const resultById = new Map(results.map((r) => [r.questionId, r]));
 
   // Exam worth 100 points total, split evenly across its questions.
-  const maxScore = items.length === 0 ? 0 : 100 / items.length;
+  const maxScore = items.length ?  100 / items.length : 0;
 
   const scoredAnswers = items.map(({ questionId, answer, rubric }) => {
     const result = resultById.get(questionId);
