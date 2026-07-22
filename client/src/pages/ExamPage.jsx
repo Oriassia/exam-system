@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import QuestionList from "../components/QuestionList";
 import SubmitButton from "../components/SubmitButton";
 import ResultsView from "../components/ResultsView";
+import ScreenLoader from "../components/ScreenLoader";
 import { fetchQuestions, submitAnswers } from "../api/examApi";
 import "../styles/ExamPage.css";
 
@@ -118,6 +119,8 @@ function ExamPage() {
 
   return (
     <div className="exam-page">
+      <ScreenLoader active={submitting} />
+
       <header className="exam-header">
         <h1>Auto-Graded Exam System</h1>
         <p>Answer all questions below and submit when ready</p>

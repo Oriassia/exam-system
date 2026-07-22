@@ -1,11 +1,11 @@
 import React from 'react'
 import '../styles/Question.css'
 
-function Question({ question, answer, onAnswerChange, disabled }) {
+function Question({ questionNumber, question, answer, onAnswerChange, disabled }) {
   return (
     <div className="question">
       <div className="question-header">
-        <span className="question-number">Question {question.id}</span>
+        <span className="question-number">Question {questionNumber}</span>
       </div>
       <div className="question-text">{question.text}</div>
       <textarea

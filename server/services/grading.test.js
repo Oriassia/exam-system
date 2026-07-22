@@ -100,6 +100,7 @@ test('maps LLM evaluations onto points: half the criteria satisfied yields half 
   assert.deepEqual(graded.answers, [
     {
       questionId: 1,
+      questionText: 'What is a hash table?',
       answer: 'A key-value store with O(1) lookup.',
       score: 25,
       maxScore: 50,
@@ -107,6 +108,7 @@ test('maps LLM evaluations onto points: half the criteria satisfied yields half 
     },
     {
       questionId: 2,
+      questionText: 'What is a stack?',
       answer: 'LIFO structure.',
       score: 25,
       maxScore: 50,

@@ -36,6 +36,8 @@ export async function gradeAnswers(items, { fetchImpl = fetch } = {}) {
   const config = getAzureOpenAIConfig();
   const url = `${config.endpoint}/openai/deployments/${config.deployment}/chat/completions?api-version=${config.version}`;
 
+  console.log(`[llm] calling Azure OpenAI deployment=${config.deployment} questions=${items.length}`);
+  const startedAt = Date.now();
   const response = await fetchImpl(url, {
     method: 'POST',
     headers: {
@@ -55,11 +57,13 @@ export async function gradeAnswers(items, { fetchImpl = fetch } = {}) {
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
+    console.error(`[llm] Azure OpenAI HTTP ${response.status} after ${Date.now() - startedAt}ms`);
     throw new Error(`Azure OpenAI request failed with status ${response.status}: ${body}`);
   }
 
   const data = await response.json();
   const content = data?.choices?.[0]?.message?.content;
+  console.log(`[llm] response received in ${Date.now() - startedAt}ms`);
 
   if (!content) {
     throw new Error('Azure OpenAI response is missing message content');
@@ -76,6 +80,7 @@ export async function gradeAnswers(items, { fetchImpl = fetch } = {}) {
     throw new Error('Azure OpenAI response is missing a "results" array');
   }
 
+  console.log(`[llm] parsed ${parsed.results.length} result(s)`);
   return parsed.results.map((result, index) => {
     if (
       typeof result.questionId !== 'number' ||

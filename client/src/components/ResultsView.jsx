@@ -2,7 +2,7 @@ import React from 'react'
 import GradedQuestion from './GradedQuestion'
 import '../styles/ResultsView.css'
 
-function ResultsView({ result, questions, actionLabel = 'Take Another Exam', onAction }) {
+function ResultsView({ result, questions = [], actionLabel = 'Take Another Exam', onAction }) {
   const questionById = new Map(questions.map((q) => [q.id, q]))
 
   return (
@@ -13,11 +13,11 @@ function ResultsView({ result, questions, actionLabel = 'Take Another Exam', onA
       </div>
 
       <div className="graded-question-list">
-        {result.answers.map((a) => (
+        {result.answers.map((a, index) => (
           <GradedQuestion
             key={a.questionId}
-            questionNumber={a.questionId}
-            questionText={questionById.get(a.questionId)?.text || 'Question'}
+            questionNumber={index + 1}
+            questionText={a.questionText || questionById.get(a.questionId)?.text || 'Question'}
             answer={a.answer}
             score={a.score}
             maxScore={a.maxScore}

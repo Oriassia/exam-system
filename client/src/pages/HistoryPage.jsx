@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import HistoryList from '../components/HistoryList'
 import ResultsView from '../components/ResultsView'
-import { fetchQuestions, fetchSubmissions } from '../api/examApi'
+import { fetchSubmissions } from '../api/examApi'
 import '../styles/HistoryPage.css'
 
 function HistoryPage() {
@@ -10,7 +10,6 @@ function HistoryPage() {
   const navigate = useNavigate()
   const [studentId, setStudentId] = useState('')
   const [submissions, setSubmissions] = useState(null)
-  const [questions, setQuestions] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -32,15 +31,8 @@ function HistoryPage() {
       setLoading(true)
       setError(null)
 
-      const [submissionsData, questionsData] = await Promise.all([
-        fetchSubmissions(studentId.trim()),
-        questions ? Promise.resolve(null) : fetchQuestions()
-      ])
-
+      const submissionsData = await fetchSubmissions(studentId.trim())
       setSubmissions(submissionsData.submissions)
-      if (questionsData) {
-        setQuestions(questionsData.questions)
-      }
     } catch (err) {
       setError('Failed to fetch submissions. Please make sure the backend is running.')
       console.error(err)
@@ -79,7 +71,6 @@ function HistoryPage() {
         </header>
         <ResultsView
           result={selectedSubmission}
-          questions={questions || []}
           actionLabel="Back to History"
           onAction={() => navigate('/history')}
         />

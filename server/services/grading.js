@@ -48,7 +48,7 @@ function scoreFromEvaluations(criteria, evaluations) {
   return satisfiedCount / criteria.length;
 }
 
-export async function gradeSubmission({ answers, questions }) {
+export async function gradeSubmission({ answers, questions, llmClient = { gradeAnswers } }) {
   const questionById = new Map(questions.map((q) => [q.id, q]));
 
   const items = answers
@@ -63,13 +63,15 @@ export async function gradeSubmission({ answers, questions }) {
       };
     });
 
-  const results = await gradeAnswers(items);
+  console.log(`[grading] built ${items.length} item(s) for LLM (from ${answers.length} answer(s))`);
+  const results = await llmClient.gradeAnswers(items);
+  console.log(`[grading] received ${results.length} LLM result(s); computing scores`);
   const resultById = new Map(results.map((r) => [r.questionId, r]));
 
   // Exam worth 100 points total, split evenly across its questions.
-  const maxScore = items.length ?  100 / items.length : 0;
+  const maxScore = items.length ? 100 / items.length : 0;
 
-  const scoredAnswers = items.map(({ questionId, answer, rubric }) => {
+  const scoredAnswers = items.map(({ questionId, questionText, answer, rubric }) => {
     const result = resultById.get(questionId);
     if (!result) {
       throw new Error(`LLM did not return a grading result for question ${questionId}`);
@@ -82,17 +84,26 @@ export async function gradeSubmission({ answers, questions }) {
 
     const quality = scoreFromEvaluations(criteria, result.evaluations);
     const feedback = buildFeedback(criteria, result.evaluations);
+    const points = quality * maxScore;
+    const satisfied = result.evaluations.filter((e) => e.satisfied).length;
+    console.log(
+      `[grading] q${questionId}: ${satisfied}/${criteria.length} criteria → ${Math.round(points * 10) / 10}/${Math.round(maxScore * 10) / 10}`
+    );
 
     return {
       questionId,
+      questionText,
       answer,
       feedback,
-      points: quality * maxScore
+      points
     };
   });
 
-  const gradedAnswers = scoredAnswers.map(({ questionId, answer, feedback, points }) => ({
+  // Persist questionText with each answer so history can render the prompt
+  // without re-fetching (and mismatched) sampled /questions sets.
+  const gradedAnswers = scoredAnswers.map(({ questionId, questionText, answer, feedback, points }) => ({
     questionId,
+    questionText,
     answer,
     score: Math.round(points * 10) / 10,
     maxScore: Math.round(maxScore * 10) / 10,
@@ -105,5 +116,6 @@ export async function gradeSubmission({ answers, questions }) {
     ? 0
     : Math.round(scoredAnswers.reduce((sum, a) => sum + a.points, 0) * 10) / 10;
 
+  console.log(`[grading] overallScore=${overallScore}`);
   return { answers: gradedAnswers, overallScore };
 }
