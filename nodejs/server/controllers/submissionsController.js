@@ -23,5 +23,20 @@ export function createSubmissionsController({ submissionService }) {
     });
   }
 
-  return { submit };
+  async function getByStudentId(req, res) {
+    const { studentId } = req.params;
+
+    if (!studentId) {
+      throw AppError.validation('studentId is required');
+    }
+
+    const submissions = await submissionService.getByStudentId(studentId);
+
+    res.status(200).json({
+      success: true,
+      submissions
+    });
+  }
+
+  return { submit, getByStudentId };
 }

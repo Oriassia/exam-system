@@ -98,3 +98,47 @@ test('propagates errors thrown by the submission service (e.g. grading failure)'
     }
   );
 });
+
+test('returns 200 with a student\'s submissions', async () => {
+  const submissions = [{ id: 'sub-1', overallScore: 90, status: 'graded' }];
+  const submissionService = fakeSubmissionService(undefined, submissions);
+  const controller = createSubmissionsController({ submissionService });
+  const req = { params: { studentId: 's1' } };
+  const res = fakeRes();
+
+  await controller.getByStudentId(req, res);
+
+  assert.deepEqual(submissionService.getByStudentIdCalls, ['s1']);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.success, true);
+  assert.deepEqual(res.body.submissions, submissions);
+});
+
+test('returns 200 with an empty array when the student has no submissions', async () => {
+  const submissionService = fakeSubmissionService(undefined, []);
+  const controller = createSubmissionsController({ submissionService });
+  const req = { params: { studentId: 's1' } };
+  const res = fakeRes();
+
+  await controller.getByStudentId(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.submissions, []);
+});
+
+test('throws a 400 validation AppError when studentId param is missing, without calling the service', async () => {
+  const submissionService = fakeSubmissionService(undefined, []);
+  const controller = createSubmissionsController({ submissionService });
+  const req = { params: {} };
+  const res = fakeRes();
+
+  await assert.rejects(
+    () => controller.getByStudentId(req, res),
+    (error) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      return true;
+    }
+  );
+  assert.equal(submissionService.getByStudentIdCalls.length, 0);
+});
