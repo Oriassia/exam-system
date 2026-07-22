@@ -66,7 +66,7 @@ Key boundary: **LLM client** (talks to Azure OpenAI only) is separate from the *
 - [x] **Repositories** (`repositories/questionsRepository.js`, `repositories/submissionsRepository.js`) — thin Mongo wrappers (`sample`/`findByIds`/`save`). Not unit-tested: one-line driver calls, meaningfully testing them needs a real/in-memory Mongo, which is disproportionate here.
 - [x] **Submission service** (`services/submissionService.js`) — orchestrates repositories + grading service: looks up matching questions, grades, and on grading failure persists the raw answers as `status: "grading_failed"` before throwing `AppError.gradingFailed(submissionId)`; on success persists `status: "graded"` and returns it. TDD, with fake repositories/grading service.
 - [x] **Controllers + `POST /submit`** (`controllers/submissionsController.js`, `routes/submissions.js`) — thin HTTP glue: validates input, delegates to `submissionService`, shapes the response. No per-error-type branching — the global `errorHandler` shapes `AppError`s (including the 502 for `grading_failed`) generically from the error's own fields. Lightly tested with fake req/res/service.
-- [ ] **Add `GET /submissions/:studentId`** — returns that student's submissions sorted by `submittedAt` desc (serves both "latest result" and "history"). *Deferred.*
+- [x] **Add `GET /submissions/:studentId`** — `submissionsRepository.findByStudentId` sorts by `submittedAt` desc in Mongo; `submissionService.getByStudentId` maps `_id` to a string `id`; `submissionsController.getByStudentId` validates the route param and shapes the `{ success, submissions }` response. TDD, with fake repository/service.
 
 ### Backend architecture layer (added beyond the original plan)
 

@@ -11,6 +11,7 @@ export function createSubmissionsRouter({ submissionService }) {
   const controller = createSubmissionsController({ submissionService });
 
   router.post('/submit', asyncHandler(controller.submit));
+  router.get('/submissions/:studentId', asyncHandler(controller.getByStudentId));
 
   return router;
 }
