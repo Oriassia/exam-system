@@ -34,7 +34,7 @@
   gap: 15px;
 }
 
-.retake-button {
+.action-button {
   align-self: center;
   padding: 12px 30px;
   font-size: 1rem;
@@ -47,6 +47,6 @@
   transition: background-color 0.3s;
 }
 
-.retake-button:hover {
+.action-button:hover {
   background-color: #43a047;
 }

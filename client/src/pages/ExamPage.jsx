@@ -109,7 +109,8 @@ function ExamPage() {
         <ResultsView
           result={result}
           questions={questions}
-          onRetake={handleRetake}
+          actionLabel="Take Another Exam"
+          onAction={handleRetake}
         />
       </div>
     );

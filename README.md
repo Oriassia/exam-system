@@ -1,87 +1,68 @@
-# Exam System
+# Exam System — Auto-Graded Exam
 
-A minimal full-stack application for managing and submitting open-ended exam questions. This project serves as a foundation for a live interview.
+A full-stack application for taking open-ended exam questions that are **automatically graded by an LLM** (Azure OpenAI), with per-question feedback and a submission history view.
+
+This started from a minimal skeleton (view questions, submit answers, no grading) and was extended into the auto-grading feature described in [`AUTO_GRADING_PLAN.md`](AUTO_GRADING_PLAN.md). Known follow-up improvements are tracked in [`IMPROVEMENTS.md`](IMPROVEMENTS.md).
 
 ## Features
 
-- **Backend Options**
-  - **Python Flask** (`python/server/`) - Flask + MongoDB
-  - **Node.js Express** (`nodejs/server/`) - Express + MongoDB
-  - Fetch exam questions from MongoDB
-  - Submit student answers
-- **Frontend (React + Vite)**
-  - Display exam questions
-  - Text input for answers
-  - Submit all answers with student ID
+- **Auto-graded exams** — student answers are graded by Azure OpenAI against a per-question rubric, in one batched LLM call per submission, returning a 0-100 quality score and written feedback per question.
+- **Results view** — after submitting, the student immediately sees their overall score (out of 100) and per-question feedback.
+- **Submission history** — look up a student's past attempts, see grade/date/question-count at a glance, and drill into any past attempt's full graded detail. Backed by real URLs (`/exam`, `/history`, `/history/:submissionId`) so browser back/forward works as expected.
+- **Resilient grading** — if the LLM call fails, the student's raw answers are still saved (`status: "grading_failed"`) instead of being lost.
+- **Randomized question sampling** — each exam samples a random subset of the question bank (via MongoDB's `$sample`), so students don't all get an identical exam.
+- **API key protection** — `GET /submissions/:studentId` requires an `X-API-Key` header, so it can be safely exposed to a trusted external caller in addition to the app's own frontend.
 
 ## Tech Stack
 
-- **Frontend**: React 18, Vite, Axios
-- **Backend Options**:
-  - **Python**: Python 3, Flask, PyMongo
-  - **Node.js**: Node.js 16+, Express, MongoDB Driver
-- **Database**: MongoDB **(local instance)**
+- **Frontend**: React 19, Vite, React Router, Axios
+- **Backend**: Node.js / Express
+- **Database**: MongoDB (local instance), seeded with exam questions (each with a grading rubric) on server startup
+- **LLM**: Azure OpenAI (chat completions)
 
 ## Project Structure
 
 ```
 exam-system/
-├── python/
-│   ├── client/                 # React frontend (Python version)
-│   │   ├── src/
-│   │   │   ├── api/           # API integration
-│   │   │   ├── components/    # React components
-│   │   │   ├── pages/         # Page components
-│   │   │   └── styles/        # CSS files
-│   │   ├── index.html
-│   │   ├── package.json
-│   │   └── vite.config.js
-│   └── server/                # Flask backend
-│       ├── db/
-│       │   └── database.py    # MongoDB connection & initialization
-│       ├── routes/
-│       │   ├── questions.py   # GET /questions endpoint
-│       │   └── submissions.py # POST /submit endpoint
-│       ├── app.py             # Flask app entry point
-│       └── requirements.txt
-├── nodejs/
-│   ├── client/                 # React frontend (Node.js version)
-│   │   ├── src/
-│   │   │   ├── api/           # API integration
-│   │   │   ├── components/    # React components
-│   │   │   ├── pages/         # Page components
-│   │   │   └── styles/        # CSS files
-│   │   ├── index.html
-│   │   ├── package.json
-│   │   └── vite.config.js
-│   └── server/                # Express backend
-│       ├── db/
-│       │   └── database.js    # MongoDB connection & initialization
-│       ├── routes/
-│       │   ├── questions.js   # GET /questions endpoint
-│       │   └── submissions.js # POST /submit endpoint
-│       ├── app.js             # Express app entry point
-│       └── package.json
+├── client/                       # React frontend
+│   ├── src/
+│   │   ├── api/examApi.js        # fetchQuestions / submitAnswers / fetchSubmissions
+│   │   ├── components/           # Sidebar, QuestionList, ResultsView, GradedQuestion,
+│   │   │                         # HistoryList, SubmissionListItem, SubmitButton, ...
+│   │   ├── pages/                # ExamPage, HistoryPage
+│   │   └── styles/
+│   ├── .env                      # VITE_SUBMISSIONS_API_KEY (gitignored)
+│   └── vite.config.js
+├── server/                       # Express backend
+│   ├── config/                   # azureOpenAIConfig.js, apiKeyConfig.js (fail-fast env readers)
+│   ├── routes/                   # questions.js, submissions.js — wiring only
+│   ├── controllers/               # thin HTTP glue (validate → delegate → shape response)
+│   ├── services/                  # gradingService.js (LLM orchestration + scoring),
+│   │                              # submissionService.js (repositories + grading service),
+│   │                              # azureOpenAiClient.js (talks to Azure OpenAI only)
+│   ├── repositories/              # thin Mongo wrappers (questions, submissions)
+│   ├── middleware/                # errorHandler/asyncHandler, apiKeyAuth
+│   ├── utils/errors.js            # single AppError class, Boom-style factory methods
+│   ├── db/database.js             # MongoDB connection + startup seeding
+│   ├── db/seedCsQuestions.js       # optional script to add more sample questions
+│   ├── .env                       # Mongo/Azure OpenAI/API key config (gitignored)
+│   └── app.js                     # composition root — wires everything together
+├── AUTO_GRADING_PLAN.md               # design + implementation checklist for this feature
+├── IMPROVEMENTS.md                    # known follow-up improvements
 └── README.md
 ```
 
+Layering in the Node backend: `routes → controllers → services → repositories → db`, with a separate `azureOpenAiClient` branch off the grading service. Every layer except the one-line Mongo repositories is unit-tested (`node:test`) with dependencies injected via factory functions, so tests never touch the network or a real database.
+
 ## Prerequisites
 
-Before running this project, make sure you have installed:
-
-- **Node.js** (v16 or higher) and npm
-- **Python** (v3.8 or higher) and pip (if using Python backend)
-- **MongoDB** (v4.4 or higher)
+- **Node.js** (v18+) and npm
+- **MongoDB** (v4.4+, needed for the `$sample` aggregation used for random question selection)
+- An **Azure OpenAI** resource with a deployed chat model (e.g. a `gpt-4o`/`gpt-5-nano`-class deployment)
 
 ### Installing MongoDB
 
-**Windows:**
-
-1. Download MongoDB Community Server from [mongodb.com](https://www.mongodb.com/try/download/community)
-2. Run the installer and follow the setup wizard
-3. MongoDB will start automatically as a Windows service
-
-**macOS (using Homebrew):**
+**macOS (Homebrew):**
 
 ```bash
 brew tap mongodb/brew
@@ -96,224 +77,112 @@ sudo apt-get install mongodb
 sudo systemctl start mongodb
 ```
 
-Verify MongoDB is running:
+**Windows:** download MongoDB Community Server from [mongodb.com](https://www.mongodb.com/try/download/community) and run the installer; it starts automatically as a Windows service.
+
+Verify MongoDB is running with `mongosh`.
+
+## Setup
+
+### 1. Backend (`server`)
 
 ```bash
-# Should connect without errors
-mongosh
+cd server
+npm install
 ```
 
-## Setup Instructions
-
-### Choose Your Backend Stack
-
-This project supports two backend implementations:
-
-- **Python Flask** (`python/server/`) - Recommended for Python developers
-- **Node.js Express** (`nodejs/server/`) - Recommended for JavaScript/Node.js developers
-
-Both backends provide the same API endpoints and functionality. Choose the one that best fits your development environment.
-
----
-
-## Option 1: Python Flask Backend
-
-### 1. Backend Setup
-
-```bash
-# Navigate to Python server directory
-cd python/server
-
-# Create a virtual environment (recommended)
-python -m venv venv
-
-# Activate virtual environment
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create .env file
-```
-
-Create a `python/server/.env` file with:
+Create `server/.env`:
 
 ```env
 MONGODB_URI=mongodb://localhost:27017/
 DB_NAME=exam_system
-PORT=5000
+PORT=5001
+
+# Azure OpenAI — bare resource URL only, NOT the full chat-completions path
+AZURE_OPENAI_ENDPOINT="https://<your-resource>.openai.azure.com"
+AZURE_OPENAI_KEY="<your-azure-openai-key>"
+AZURE_OPENAI_VERSION="2024-12-01-preview"
+AZURE_OPENAI_DEPLOYMENT="<your-deployment-name>"
+
+# Protects GET /submissions/:studentId — any long random string
+SUBMISSIONS_API_KEY="<generate-with-crypto.randomBytes(32).toString('hex')>"
 ```
 
-### 2. Frontend Setup
+The server fails fast at startup if any required var is missing, and prints exactly which ones. Questions (with rubrics) are seeded automatically into MongoDB the first time it runs; `db/seedCsQuestions.js` can be run separately (`node db/seedCsQuestions.js`) to add a larger CS question bank.
+
+### 2. Frontend (`client`)
 
 ```bash
-# Navigate to Python client directory (from project root)
-cd python/client
-
-# Install dependencies
+cd client
 npm install
 ```
 
-### 3. Running the Application
-
-**Terminal 1 - Backend:**
-
-```bash
-cd python/server
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Mac/Linux
-python app.py
-```
-
-✅ Backend running on http://localhost:5000
-
-**Terminal 2 - Frontend:**
-
-```bash
-cd python/client
-npm run dev
-```
-
-✅ Frontend running on http://localhost:3000
-
----
-
-## Option 2: Node.js Express Backend
-
-### 1. Backend Setup
-
-```bash
-# Navigate to Node.js server directory
-cd nodejs/server
-
-# Install dependencies
-npm install
-
-# Create .env file
-```
-
-Create a `nodejs/server/.env` file with:
+Create `client/.env`:
 
 ```env
-MONGODB_URI=mongodb://localhost:27017/
-DB_NAME=exam_system
-PORT=5000
+VITE_SUBMISSIONS_API_KEY="<same value as SUBMISSIONS_API_KEY above>"
 ```
 
-### 2. Frontend Setup
+### 3. Running
+
+**Terminal 1 — backend:**
 
 ```bash
-# Navigate to Node.js client directory (from project root)
-cd nodejs/client
-
-# Install dependencies
-npm install
-```
-
-### 3. Running the Application
-
-**Terminal 1 - Backend:**
-
-```bash
-cd nodejs/server
+cd server
 npm start
-# Or for development with auto-reload:
+# or, for auto-reload on file changes:
 npm run dev
 ```
 
-✅ Backend running on http://localhost:5000
+✅ Backend running on http://localhost:5001
 
-**Terminal 2 - Frontend:**
+**Terminal 2 — frontend:**
 
 ```bash
-cd nodejs/client
+cd client
 npm run dev
 ```
 
 ✅ Frontend running on http://localhost:3000
 
----
+### 4. Testing / linting
 
-## Access the Application
-
-Open your browser and navigate to:
-
-```
-http://localhost:3000
+```bash
+cd server && npm test    # node:test — services, controllers, config, middleware
+cd client && npm run lint
 ```
 
 ## Usage
 
-1. **Enter Student ID**: Type your student ID in the input field
-2. **Answer Questions**: Each question has a text area for your answer
-3. **Submit**: Click "Submit Exam" to submit all answers
-4. **Confirmation**: A success message will appear upon successful submission
+1. **Take Exam** — enter a Student ID, answer the sampled questions, and submit.
+2. **Grading** — the server fetches the matching questions/rubrics, sends everything to Azure OpenAI in one call, and returns a graded result in the same response (synchronous).
+3. **Results** — see the overall score (out of 100) plus feedback for each question, right after submitting.
+4. **History** — switch to the History tab, enter a Student ID, and browse past attempts; click one to see its full graded detail. Back/forward navigation works via the browser as usual.
 
 ## Troubleshooting
 
-### MongoDB Connection Issues
+**MongoDB connection refused** — ensure MongoDB is running (`mongosh`) on the default port `27017`, and that `MONGODB_URI` in `.env` is correct.
 
-**Error: "Connection refused"**
+**Server exits immediately with "Missing required environment variable(s)"** — one of the required `.env` vars (Azure OpenAI or `SUBMISSIONS_API_KEY`) is unset; the error message lists exactly which ones.
 
-- Ensure MongoDB is running: `mongosh`
-- Check if MongoDB is on the default port: 27017
-- Verify `.env` file has correct `MONGODB_URI`
+**Azure OpenAI requests 404** — `AZURE_OPENAI_ENDPOINT` must be the bare resource URL (`https://<resource>.openai.azure.com`), not the full `/openai/deployments/.../chat/completions` path — the client appends that itself.
 
-### Port Already in Use
+**Azure OpenAI requests fail with a 400 about `temperature`** — some deployments (e.g. `gpt-5-nano`) only support the default `temperature` (1); the client intentionally omits `temperature` from the request for this reason.
 
-**Backend (Port 5000):**
+**`GET /submissions/:studentId` returns 401** — the caller is missing the `X-API-Key` header or sent the wrong value. The frontend reads it from `VITE_SUBMISSIONS_API_KEY`, which requires restarting the Vite dev server after creating/changing `client/.env` (Vite only reads env files at startup).
 
-- Change `PORT` in `server/.env`
-- Update `API_BASE_URL` in `client/src/api/examApi.js`
+**Port already in use** — change `PORT` in `server/.env` and update `API_BASE_URL` in `client/src/api/examApi.js` to match.
 
-**Frontend (Port 3000):**
-
-- Vite will automatically suggest another port
-- Or change port in `client/vite.config.js`
-
-### CORS Issues
-
-Both backends have CORS enabled for all origins. If you encounter CORS errors:
-
-- Ensure both frontend and backend are running
-- Check browser console for specific error messages
-
-### Python Dependencies (Flask Backend)
-
-If you encounter import errors:
+**Node module errors:**
 
 ```bash
-pip install --upgrade pip
-pip install -r requirements.txt --force-reinstall
-```
-
-### Node.js Dependencies (Express Backend)
-
-If you encounter module errors:
-
-```bash
-cd nodejs/server
+cd server   # or client
 rm -rf node_modules package-lock.json
 npm install
 ```
 
-## Development Notes
+## Notes
 
-- Both backends automatically initialize sample questions on first run
-- Submissions are stored with timestamps for future reference
-- No authentication is required (suitable for local development)
-- Both implementations use the same MongoDB database (`exam_system`)
-- The client-side code is identical for both versions
-
-## Quick Start Comparison
-
-| Task           | Python Flask                                          | Node.js Express                   |
-| -------------- | ----------------------------------------------------- | --------------------------------- |
-| Backend Setup  | `cd python/server && pip install -r requirements.txt` | `cd nodejs/server && npm install` |
-| Frontend Setup | `cd python/client && npm install`                     | `cd nodejs/client && npm install` |
-| Run Backend    | `python app.py`                                       | `npm start`                       |
-| Run Frontend   | `npm run dev`                                         | `npm run dev`                     |
-| Ports          | Backend: 5000, Frontend: 3000                         | Backend: 5000, Frontend: 3000     |
+- `.env` files (both server and client) are gitignored — no secrets are committed.
+- `client/src/api/examApi.js` points at `http://localhost:5001`, matching `PORT=5001` in `server/.env`.
+- CORS is enabled for all origins on the backend (suitable for local development, not for production as-is).
+- See [`AUTO_GRADING_PLAN.md`](AUTO_GRADING_PLAN.md) for the full design/decision log and [`IMPROVEMENTS.md`](IMPROVEMENTS.md) for known gaps (e.g. `GET /questions` and `POST /submit` still have no auth, and there's no real student identity/account system yet).

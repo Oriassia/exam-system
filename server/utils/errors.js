@@ -22,4 +22,8 @@ export class AppError extends Error {
       submissionId
     });
   }
+
+  static unauthorized(message = 'Missing or invalid API key') {
+    return new AppError(message, 401, { code: 'UNAUTHORIZED' });
+  }
 }

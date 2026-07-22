@@ -1,10 +1,10 @@
 # Auto-Graded Exam — Implementation Plan
 
-Tracking doc for the auto-grading feature. Stack: **Node.js/Express** backend (`nodejs/server`), **React** frontend (`nodejs/client`), MongoDB, Azure OpenAI for grading.
+Tracking doc for the auto-grading feature. Stack: **Node.js/Express** backend (`server`), **React** frontend (`client`), MongoDB, Azure OpenAI for grading.
 
 ## Decisions
 
-- **Backend**: Node.js/Express (Azure OpenAI creds already configured in `nodejs/server/.env`).
+- **Backend**: Node.js/Express (Azure OpenAI creds already configured in `server/.env`).
 - **Grading flow**: Synchronous — `POST /submit` calls the LLM inline and returns the graded result in the same response.
 - **LLM calls**: Batched — one chat completion per submission (all questions + rubrics + answers in one prompt), not one call per question.
 - **Scope**: Required grading flow + submission history (optional feature) + a few automated tests around the grading logic.
@@ -77,13 +77,13 @@ Key boundary: **LLM client** (talks to Azure OpenAI only) is separate from the *
 
 - [x] **Results view** — after a successful submit, `ExamPage` replaces the exam form with a `ResultsView` (`components/ResultsView.jsx`) showing the overall score (out of 100) plus one `GradedQuestion` (`components/GradedQuestion.jsx`) per answer — question text (looked up from the already-loaded `questions` state), the student's submitted answer, a color-banded score badge showing `score/maxScore` (band thresholds computed as a percentage of `maxScore`, since each question's max is `100 / questionCount`, not a flat 100), and the LLM feedback — reusing `Question.css`'s layout read-only. A "Take Another Exam" button (`onRetake`) clears the result and reloads a fresh sampled set of questions.
 - [x] **Submit error handling** — `ExamPage.handleSubmit` branches on `err.response.data.code`: `VALIDATION_ERROR` surfaces the backend's own message, `GRADING_FAILED` shows a distinct "answers were saved but grading failed" message with the `submissionId` (without clearing the student's in-progress answers), anything else falls back to the generic submit-failed message.
-- [ ] **`examApi.js`** — add `fetchSubmissions(studentId)`. *Deferred — depends on `GET /submissions/:studentId` below.*
-- [ ] **History view (optional feature)** — simple tab/toggle in `App.jsx` between "Take Exam" and "History" (no router needed); `SubmissionHistory` component lists past attempts with date + score, expandable for feedback. *Deferred.*
+- [x] **`examApi.js`** — added `fetchSubmissions(studentId)`, hitting `GET /submissions/:studentId`.
+- [x] **History view** — `App.jsx` renders a persistent `Sidebar` (`components/Sidebar.jsx`) with "Take Exam"/"History" tabs, now backed by `react-router-dom` routes (`/exam`, `/history`, `/history/:submissionId`) instead of local `useState`, so browser back/forward works between pages and between the history list and a submission's detail view. `pages/HistoryPage.jsx` has a student ID input + fetch button, loads that student's submissions plus the question bank (for text lookups), and renders `HistoryList` (`components/HistoryList.jsx`) — a summary-only list of `SubmissionListItem`s (attempt number computed from position since the API returns newest-first, oldest = #1; date; grade; question count; a "Grading failed" badge for `grading_failed` submissions instead of a score). Clicking a graded item navigates to `/history/:submissionId` and drills into the same `ResultsView` used after a live submit, in a read-only detail page with a "Back to History" action; `ResultsView` was generalized to take `actionLabel`/`onAction` instead of a retake-specific prop so both flows share it. Clicking a `grading_failed` item shows a short explanatory message instead (no per-question data exists for those).
 
 ## Notes
 
 - `.env` is already gitignored — Azure key is safe from being committed.
-- `nodejs/client/src/api/examApi.js` points at port `5001`, matching `PORT=5001` in `nodejs/server/.env` — consistent.
+- `client/src/api/examApi.js` points at port `5001`, matching `PORT=5001` in `server/.env` — consistent.
 - **`AZURE_OPENAI_ENDPOINT` gotcha**: this must be the bare resource URL (e.g. `https://<resource>.openai.azure.com`), *not* the full `/openai/deployments/.../chat/completions?api-version=...` path — `azureOpenAiClient.js` appends that path itself, and a full URL in `.env` silently produces a malformed double-appended URL that Azure 404s on.
 - **`gpt-5-nano` temperature gotcha**: this deployment only supports the default `temperature` (1) and rejects an explicit `temperature: 0` with a 400. `azureOpenAiClient.js` intentionally omits the `temperature` field from the chat-completions request body for this reason — if the deployment/model changes to one that supports `temperature: 0`, revisit this for more deterministic grading.
 - Verified end-to-end against the real Azure OpenAI deployment and MongoDB: `POST /submit` returns `201` with real per-question scores/feedback and a computed `overallScore`.

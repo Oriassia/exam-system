@@ -2,7 +2,7 @@ import React from 'react'
 import GradedQuestion from './GradedQuestion'
 import '../styles/ResultsView.css'
 
-function ResultsView({ result, questions, onRetake }) {
+function ResultsView({ result, questions, actionLabel = 'Take Another Exam', onAction }) {
   const questionById = new Map(questions.map((q) => [q.id, q]))
 
   return (
@@ -26,9 +26,11 @@ function ResultsView({ result, questions, onRetake }) {
         ))}
       </div>
 
-      <button className="retake-button" onClick={onRetake}>
-        Take Another Exam
-      </button>
+      {onAction && (
+        <button className="action-button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      )}
     </div>
   )
 }

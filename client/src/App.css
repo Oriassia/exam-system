@@ -5,6 +5,18 @@
   text-align: center;
 }
 
+.app-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  text-align: left;
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

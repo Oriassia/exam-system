@@ -24,3 +24,15 @@ export const submitAnswers = async (studentId, answers) => {
         throw error
     }
 }
+
+export const fetchSubmissions = async (studentId) => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/submissions/${studentId}`, {
+            headers: { 'X-API-Key': import.meta.env.VITE_SUBMISSIONS_API_KEY }
+        })
+        return response.data
+    } catch (error) {
+        console.error('Error fetching submissions:', error)
+        throw error
+    }
+}
