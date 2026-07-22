@@ -32,7 +32,7 @@ History page         ──GET───▶ /submissions/:studentId  → list fro
 
 Key boundary: **LLM client** (talks to Azure OpenAI only) is separate from the **grading service** (orchestrates Mongo + LLM client). Neither knows about Express/HTTP.
 
-**Backend layering** (implemented): `routes -> controllers -> services -> repositories -> db (Mongo)`, with a separate `services/azureOpenAiClient.js -> Azure OpenAI` branch off the grading service. Errors use a single `AppError` class with factory methods (`AppError.validation(...)`, `AppError.gradingFailed(submissionId)`) plus a global `errorHandler`/`asyncHandler` middleware pair, instead of ad-hoc `try/catch` in every route. Every layer that isn't a thin Mongo wrapper is built test-first (`node:test`) with dependencies (LLM client, repositories) injected via factory functions, so tests never touch the network or a real database.
+**Backend layering** (as originally implemented, see checklist below): `routes -> controllers -> services -> repositories -> db (Mongo)`, with a separate `services/azureOpenAiClient.js -> Azure OpenAI` branch off the grading service, and dependencies (LLM client, repositories) injected via factory functions. This was later simplified twice — first folding repositories into services and merging `config`/`utils`, then removing controllers and factory wiring entirely in favor of routes that call Mongo and plain service functions directly. Current layering is just `routes -> services -> db (Mongo)`, with `services/llm.js -> Azure OpenAI`; see the [README](README.md#project-structure) for the up-to-date structure. Errors still use a single `AppError` class with factory methods (`AppError.validation(...)`, `AppError.gradingFailed(submissionId)`) plus a global `errorHandler`/`asyncHandler` middleware pair, instead of ad-hoc `try/catch` in every route. Only `services/grading.js` (the LLM orchestration/scoring math) is unit-tested (`node:test`), with its LLM client passed in as an overridable parameter so tests never touch the network.
 
 ## Data model
 
@@ -71,7 +71,7 @@ Key boundary: **LLM client** (talks to Azure OpenAI only) is separate from the *
 ### Backend architecture layer (added beyond the original plan)
 
 - [x] **Error handling** (`utils/errors.js`, `middleware/errorHandler.js`) — single `AppError` class with `validation()`/`gradingFailed()` factory methods (Boom-style, not a subclass hierarchy) + `asyncHandler`/`errorHandler` middleware, replacing ad-hoc `try/catch { res.status(500)... }` in routes.
-- [x] **Layering** — `routes -> controllers -> services -> repositories -> db`, with dependencies composed in `app.js` (the composition root) and injected via factory functions everywhere, so every layer except the Mongo repositories is unit-testable in isolation.
+- [x] **Layering** — originally `routes -> controllers -> services -> repositories -> db`, with dependencies composed in `app.js` and injected via factory functions everywhere. Later simplified to `routes -> services -> db`: routes call Mongo and plain service functions directly, no controllers, repositories, or factories remain (see the note under Architecture above).
 
 ### Frontend
 
@@ -84,6 +84,6 @@ Key boundary: **LLM client** (talks to Azure OpenAI only) is separate from the *
 
 - `.env` is already gitignored — Azure key is safe from being committed.
 - `client/src/api/examApi.js` points at port `5001`, matching `PORT=5001` in `server/.env` — consistent.
-- **`AZURE_OPENAI_ENDPOINT` gotcha**: this must be the bare resource URL (e.g. `https://<resource>.openai.azure.com`), *not* the full `/openai/deployments/.../chat/completions?api-version=...` path — `azureOpenAiClient.js` appends that path itself, and a full URL in `.env` silently produces a malformed double-appended URL that Azure 404s on.
-- **`gpt-5-nano` temperature gotcha**: this deployment only supports the default `temperature` (1) and rejects an explicit `temperature: 0` with a 400. `azureOpenAiClient.js` intentionally omits the `temperature` field from the chat-completions request body for this reason — if the deployment/model changes to one that supports `temperature: 0`, revisit this for more deterministic grading.
+- **`AZURE_OPENAI_ENDPOINT` gotcha**: this must be the bare resource URL (e.g. `https://<resource>.openai.azure.com`), *not* the full `/openai/deployments/.../chat/completions?api-version=...` path — `services/llm.js` appends that path itself, and a full URL in `.env` silently produces a malformed double-appended URL that Azure 404s on.
+- **`gpt-5-nano` temperature gotcha**: this deployment only supports the default `temperature` (1) and rejects an explicit `temperature: 0` with a 400. `services/llm.js` intentionally omits the `temperature` field from the chat-completions request body for this reason — if the deployment/model changes to one that supports `temperature: 0`, revisit this for more deterministic grading.
 - Verified end-to-end against the real Azure OpenAI deployment and MongoDB: `POST /submit` returns `201` with real per-question scores/feedback and a computed `overallScore`.

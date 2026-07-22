@@ -34,25 +34,22 @@ exam-system/
 │   ├── .env                      # VITE_SUBMISSIONS_API_KEY (gitignored)
 │   └── vite.config.js
 ├── server/                       # Express backend
-│   ├── config/                   # azureOpenAIConfig.js, apiKeyConfig.js (fail-fast env readers)
-│   ├── routes/                   # questions.js, submissions.js — wiring only
-│   ├── controllers/               # thin HTTP glue (validate → delegate → shape response)
-│   ├── services/                  # gradingService.js (LLM orchestration + scoring),
-│   │                              # submissionService.js (repositories + grading service),
-│   │                              # azureOpenAiClient.js (talks to Azure OpenAI only)
-│   ├── repositories/              # thin Mongo wrappers (questions, submissions)
+│   ├── routes/                   # questions.js, submissions.js — Mongo queries inline
+│   ├── services/                  # grading.js (LLM orchestration + scoring),
+│   │                              # llm.js (talks to Azure OpenAI only)
 │   ├── middleware/                # errorHandler/asyncHandler, apiKeyAuth
-│   ├── utils/errors.js            # single AppError class, Boom-style factory methods
+│   ├── config.js                  # azure OpenAI + API key env readers (fail-fast)
+│   ├── errors.js                  # single AppError class, Boom-style factory methods
 │   ├── db/database.js             # MongoDB connection + startup seeding
 │   ├── db/seedCsQuestions.js       # optional script to add more sample questions
 │   ├── .env                       # Mongo/Azure OpenAI/API key config (gitignored)
-│   └── app.js                     # composition root — wires everything together
+│   └── app.js                     # express setup — mounts routers directly, no DI wiring
 ├── AUTO_GRADING_PLAN.md               # design + implementation checklist for this feature
 ├── IMPROVEMENTS.md                    # known follow-up improvements
 └── README.md
 ```
 
-Layering in the Node backend: `routes → controllers → services → repositories → db`, with a separate `azureOpenAiClient` branch off the grading service. Every layer except the one-line Mongo repositories is unit-tested (`node:test`) with dependencies injected via factory functions, so tests never touch the network or a real database.
+The Node backend is intentionally thin for its 3 endpoints: each route in `routes/` talks to Mongo directly and calls plain functions in `services/` — no controllers, repositories, or `createX({ deps })` factory wiring. `services/grading.js` takes its LLM client as an overridable parameter (defaulting to the real `services/llm.js`), which is enough to unit-test the grading math (`node:test`) without hitting the network.
 
 ## Prerequisites
 
@@ -147,7 +144,7 @@ npm run dev
 ### 4. Testing / linting
 
 ```bash
-cd server && npm test    # node:test — services, controllers, config, middleware
+cd server && npm test    # node:test — grading service math
 cd client && npm run lint
 ```
 

@@ -1,16 +1,23 @@
 import express from 'express';
-import { createQuestionsController } from '../controllers/questionsController.js';
+import { getDb } from '../db/database.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
-/**
- * Route wiring only - no Mongo or business logic here. The controller
- * and its dependencies are composed in app.js.
- */
-export function createQuestionsRouter({ questionsService }) {
-  const router = express.Router();
-  const controller = createQuestionsController({ questionsService });
+const router = express.Router();
+const DEFAULT_QUESTION_COUNT = 5;
 
-  router.get('/questions', asyncHandler(controller.getQuestions));
+router.get('/questions', asyncHandler(async (req, res) => {
+  const db = await getDb();
+  const questionsCollection = db.collection('questions');
 
-  return router;
-}
+  const requested = parseInt(req.query.count, 10);
+  const count = Number.isInteger(requested) && requested > 0 ? requested : DEFAULT_QUESTION_COUNT;
+  const totalCount = await questionsCollection.countDocuments({});
+
+  const questions = await questionsCollection
+    .aggregate([{ $sample: { size: Math.min(totalCount, count) } }, { $project: { _id: 0 } }])
+    .toArray();
+
+  res.status(200).json({ success: true, questions });
+}));
+
+export default router;
