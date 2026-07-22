@@ -1,4 +1,4 @@
-import { AppError } from '../utils/errors.js';
+import { AppError } from '../errors.js';
 
 /**
  * Thin HTTP glue: parse/validate the request, delegate to the

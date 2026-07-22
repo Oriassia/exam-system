@@ -8,7 +8,7 @@ const DEFAULT_QUESTION_COUNT = 5;
  * one-line driver calls, and testing them meaningfully needs a real (or
  * in-memory) MongoDB, which is disproportionate for this project.
  */
-export const questionsRepository = {
+export const questionsService = {
   async sample(count = DEFAULT_QUESTION_COUNT) {
     const db = await getDb();
     const questionsCollection = db.collection('questions');

@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'crypto';
-import { AppError } from '../utils/errors.js';
+import { AppError } from '../errors.js';
 
 /**
  * Guards a route with a static API key sent as `X-API-Key`. Comparison

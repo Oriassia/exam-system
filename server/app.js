@@ -2,13 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { initDb } from './db/database.js';
-import { getAzureOpenAIConfig } from './config/azureOpenAIConfig.js';
-import { getApiKeyConfig } from './config/apiKeyConfig.js';
+import { getAzureOpenAIConfig, getApiKeyConfig } from './config.js';
 import { createAzureOpenAiClient } from './services/azureOpenAiClient.js';
 import { createGradingService } from './services/gradingService.js';
 import { createSubmissionService } from './services/submissionService.js';
-import { questionsRepository } from './repositories/questionsRepository.js';
-import { submissionsRepository } from './repositories/submissionsRepository.js';
+import { questionsService } from './services/questionsService.js';
 import { createQuestionsRouter } from './routes/questions.js';
 import { createSubmissionsRouter } from './routes/submissions.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -39,14 +37,10 @@ async function startServer() {
 
     const llmClient = createAzureOpenAiClient({ config: azureOpenAIConfig });
     const gradingService = createGradingService({ llmClient });
-    const submissionService = createSubmissionService({
-      questionsRepository,
-      submissionsRepository,
-      gradingService
-    });
+    const submissionService = createSubmissionService({ questionsService, gradingService });
     const apiKeyAuth = createApiKeyAuth({ apiKey: apiKeyConfig.submissionsApiKey });
 
-    app.use('/', createQuestionsRouter({ questionsRepository }));
+    app.use('/', createQuestionsRouter({ questionsService }));
     app.use('/', createSubmissionsRouter({ submissionService, apiKeyAuth }));
 
     // Must be registered after all routes so it can catch their errors.

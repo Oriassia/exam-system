@@ -1,4 +1,4 @@
-import { AppError } from '../utils/errors.js';
+import { AppError } from '../errors.js';
 
 /**
  * Wraps an async controller method so a rejected promise reaches
