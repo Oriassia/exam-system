@@ -1,12 +1,5 @@
 import { gradeAnswers } from './llm.js';
 
-/**
- * Pure grading orchestration: matches submitted answers to their questions,
- * delegates the actual grading to `llmClient`, and computes the overall
- * score. `llmClient` defaults to the real Azure OpenAI call but can be
- * overridden (e.g. in tests) since it's just a plain parameter, not a
- * factory-injected dependency.
- */
 export async function gradeSubmission({ answers, questions, llmClient = { gradeAnswers } }) {
   const questionById = new Map(questions.map((q) => [q.id, q]));
 
@@ -25,8 +18,7 @@ export async function gradeSubmission({ answers, questions, llmClient = { gradeA
   const results = await llmClient.gradeAnswers(items);
   const resultById = new Map(results.map((r) => [r.questionId, r]));
 
-  // The exam is worth 100 points total, split evenly across its questions,
-  // so a perfect submission's per-question points always sum to 100.
+  // Exam worth 100 points total, split evenly across its questions.
   const maxScore = items.length === 0 ? 0 : 100 / items.length;
 
   const scoredAnswers = items.map(({ questionId, answer }) => {
