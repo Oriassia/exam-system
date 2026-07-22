@@ -1,11 +1,28 @@
 import { getAzureOpenAIConfig } from '../config.js';
 
-const SYSTEM_PROMPT = `You are an exam grader. You will be given a list of exam questions, each with its grading rubric and a student's answer. For each question, grade the student's answer against its rubric on a 0-100 scale and give brief, specific feedback.
+const SYSTEM_PROMPT = `You are an expert exam grader. Evaluate each student's answer against a strict binary rubric.
+
+For every criterion on every question:
+1. Quote the specific part of the student's answer that satisfies the criterion.
+2. If the concept is missing or incorrect, set quote to "Missing".
+3. Assign satisfied: true only if the criterion is clearly met; otherwise false.
+4. Do NOT invent a numeric score — only judge each criterion.
 
 Respond with ONLY a JSON object of this exact shape, no extra commentary:
-{"results":[{"questionId": number, "score": number, "feedback": string}]}
+{"results":[{"questionId":number,"evaluations":[{"criterionId":string,"quote":string,"satisfied":boolean}]}]}
 
-Include exactly one result per question, in any order, using the same questionId values you were given.`;
+Include exactly one result per question, using the same questionId values you were given. Include exactly one evaluation per criterion id from that question's rubric.
+
+Few-shot example:
+Question: "What is a stack?"
+Criteria: [{id:"lifo",description:"States stack is LIFO"},{id:"ops",description:"Mentions push and pop"}]
+Student answer: "A stack is LIFO. You push items on."
+Correct output fragment:
+{"questionId":1,"evaluations":[
+  {"criterionId":"lifo","quote":"A stack is LIFO","satisfied":true},
+  {"criterionId":"ops","quote":"You push items on","satisfied":false}
+]}
+(ops is false because pop was not mentioned.)`;
 
 function buildUserMessage(items) {
   return JSON.stringify({ questions: items });
@@ -15,11 +32,11 @@ function buildUserMessage(items) {
  * Azure OpenAI chat-completions call for batch-grading a submission in one
  * request. Talks only to Azure OpenAI - no Mongo/Express imports.
  */
-export async function gradeAnswers(items) {
+export async function gradeAnswers(items, { fetchImpl = fetch } = {}) {
   const config = getAzureOpenAIConfig();
   const url = `${config.endpoint}/openai/deployments/${config.deployment}/chat/completions?api-version=${config.version}`;
 
-  const response = await fetch(url, {
+  const response = await fetchImpl(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -62,16 +79,31 @@ export async function gradeAnswers(items) {
   return parsed.results.map((result, index) => {
     if (
       typeof result.questionId !== 'number' ||
-      typeof result.score !== 'number' ||
-      typeof result.feedback !== 'string'
+      !Array.isArray(result.evaluations)
     ) {
       throw new Error(`Azure OpenAI response has a malformed grading result at index ${index}`);
     }
 
+    const evaluations = result.evaluations.map((evaluation, evalIndex) => {
+      if (
+        typeof evaluation.criterionId !== 'string' ||
+        typeof evaluation.quote !== 'string' ||
+        typeof evaluation.satisfied !== 'boolean'
+      ) {
+        throw new Error(
+          `Azure OpenAI response has a malformed evaluation at result ${index}, evaluation ${evalIndex}`
+        );
+      }
+      return {
+        criterionId: evaluation.criterionId,
+        quote: evaluation.quote,
+        satisfied: evaluation.satisfied
+      };
+    });
+
     return {
       questionId: result.questionId,
-      score: Math.max(0, Math.min(100, result.score)),
-      feedback: result.feedback
+      evaluations
     };
   });
 }
