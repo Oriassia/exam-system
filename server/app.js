@@ -5,7 +5,6 @@ import { initDb } from './db/database.js';
 import { getAzureOpenAIConfig, getApiKeyConfig } from './config.js';
 import questionsRouter from './routes/questions.js';
 import submissionsRouter from './routes/submissions.js';
-import { errorHandler } from './middleware/errorHandler.js';
 
 // Load environment variables
 dotenv.config();
@@ -31,9 +30,6 @@ async function startServer() {
 
     app.use('/', questionsRouter);
     app.use('/', submissionsRouter);
-
-    // Must be registered after all routes so it can catch their errors.
-    app.use(errorHandler);
 
     await initDb();
     app.listen(PORT, () => {
