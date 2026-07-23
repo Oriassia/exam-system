@@ -1,6 +1,64 @@
-# Improvement Suggestions
+# Interview notes — what we built vs the starter
 
-- [DONE] **Add authentication/authorization to API endpoints** — `GET /submissions/:studentId` is now gated by a static API key (`middleware/apiKeyAuth.js`, configured via `SUBMISSIONS_API_KEY`), required as an `X-API-Key` header and checked with a timing-safe comparison; the React client sends it via `VITE_SUBMISSIONS_API_KEY`. `GET /questions` and `POST /submit` are still open with no auth check — anyone who can reach the backend port can read exam questions or submit answers under any `studentId` with no verification. Consider adding auth to those too (and validating that the submitting student is who they claim to be) if/when they need to be exposed beyond the trusted frontend.
-- **No real user/student identity** — there is no `users` collection or account system anywhere. `studentId` on submit is just a free-text string typed into the frontend, with no lookup, verification, or uniqueness enforcement. Nothing stops duplicate submissions under the same ID, submissions under a fake/arbitrary ID, or one person submitting repeatedly under different IDs. Consider introducing a `users` collection with real accounts (or at least pre-registered student IDs) and validating submissions against it.
-- [DONE] **`GET /questions` always returned the same fixed set** — with more questions added to the bank, `find({})` returned every document in the same natural/insertion order every time, so every student got an identical exam. Fixed by using a MongoDB `$sample` aggregation to return a random subset (default 5, configurable via `?count=N`) in random order on each request.
-- [DONE] **Browser back/forward didn't work** — page switching (`App.jsx`) and drilling into a submission (`HistoryPage.jsx`) were both plain `useState`, so neither pushed a browser history entry; back/forward did nothing or left the app entirely. Fixed by adding `react-router-dom` with real routes (`/exam`, `/history`, `/history/:submissionId`), so the Sidebar tabs and the History list/detail views are now proper navigable URLs.
+Started from the thin skeleton ([Exam-Generator-AI/exam-system](https://github.com/Exam-Generator-AI/exam-system)): view questions, submit answers, no grading, dual Python/Node trees. We kept **Node + React only**, flattened to `client/` + `server/`, and added auto-grading end-to-end.
+
+---
+
+## LLM grading
+
+1. LLM gets question text, student answer, and a **binary rubric** (`criteria[{ id, description }]`). For each criterion it returns `{ criterionId, quote, satisfied }` — **no numeric scores from the model**.
+2. **Our code** turns that into points: `quality = satisfiedCount / criteriaCount`, then `points = quality * (100 / questionCount)`. Overall = sum of unrounded per-question points (rounded once at the end → perfect exam hits exactly 100).
+3. Feedback string is also built in code (`Met: … / Missing: …`) from the same evaluations — not free-form LLM prose as the score source.
+4. **One batched call** per submission (all Q+A+rubrics in one prompt), `response_format: json_object`, few-shot in the system prompt.
+5. **Retry + exponential backoff** (up to 3 attempts) on transient failures: HTTP 429/502/503/504, network errors, empty content. Delay ≈ `200 * 4^(attempt-1)` + jitter.
+6. Non-retryable / exhausted retries → submit still **saves raw answers** as `status: "grading_failed"` and returns **502** with `submissionId` (answers not lost).
+
+## Submit flow (`POST /submit`)
+
+1. Validate `studentId` + non-empty `answers`.
+2. Load matching questions (+ rubrics) from Mongo by `questionId`.
+3. Call `gradeSubmission` → `gradeAnswers` (LLM) → score math.
+4. Persist graded doc (`status: "graded"`, `overallScore`, per-answer `score`/`maxScore`/`feedback`/`questionText`) or the failed path above.
+5. Sync response: client shows `ResultsView` immediately from the same response.
+
+## Questions (`GET /questions`)
+
+1. Mongo `$sample` of **5** questions each request — random set/order so exams aren’t identical.
+2. Each question ships a structured rubric used only server-side at grade time (client doesn’t need it to display the exam).
+
+## History (`GET /submissions/:studentId`)
+
+1. Guarded by static **`X-API-Key`** (`apiKeyAuth`) — timing-safe compare vs `SUBMISSIONS_API_KEY`.
+2. Sorted newest-first; maps `_id` → string `id`.
+3. **`questionText` denormalized** onto each graded answer at submit time so history doesn’t depend on the current sampled `/questions` set; older rows without it get a fallback lookup from the question bank.
+
+## Frontend
+
+1. **React Router**: `/exam`, `/history`, `/history/:submissionId` — browser back/forward works (starter used plain `useState` “pages”).
+2. **ResultsView / GradedQuestion** — overall score + per-question answer, score badge, feedback; shared by live submit and history detail.
+3. **HistoryPage** — lookup by student ID, list summary (date, grade, attempt #, grading-failed badge), drill into detail or a short failed-grading message.
+4. **ScreenLoader** while submit/grading is in flight.
+5. Retake clears result and reloads a fresh sampled exam.
+
+## Backend shape / quality
+
+1. Thin stack: `routes → services → db` (no controllers/repos/DI factories).
+2. Boundary: `llm.js` = Azure only; `grading.js` = orchestration + scoring math (LLM client injectable for tests).
+3. Fail-fast config at startup for Azure OpenAI + API key env vars.
+4. Unit tests (`node:test`): `llm.test.js` (parse, retry/backoff), `grading.test.js` (criteria scoring, feedback, overall math).
+5. Extra CS question bank via `db/seedCsQuestions.js` (upserts structured rubrics).
+
+---
+
+## Suggestions (noticed, not implemented)
+
+- **No real student identity** — `studentId` is free text; no users collection, no verification, duplicates/fakes allowed.
+- **Auth only on history** — `GET /questions` and `POST /submit` are still open; anyone who can hit the port can read the bank or submit as anyone.
+- **Frontend error `code` mismatch** — ExamPage still branches on `VALIDATION_ERROR` / `GRADING_FAILED`, but the route returns plain `{ error, submissionId? }` without `code` (so those specific messages may never show).
+- **History deep-link fragility** — hard refresh on `/history/:submissionId` without a prior fetch falls back to the search form (selected row isn’t loaded from the URL alone).
+- **Equal weights only** — all questions share `100 / N`; all criteria inside a question weigh the same. No per-criterion or per-question weights.
+- **Sync grading only** — long LLM latency blocks the request; no queue / async job + poll.
+- **No rate limiting / answer length caps** — abuse and oversized prompts not guarded.
+- **Limited test surface** — unit tests for LLM + grading math only; no route/integration/e2e tests.
+- **Centralized errors dropped** — earlier `AppError` + global handler were removed; routes use local try/catch and ad-hoc status codes.
+- **Sample size fixed at 5** — earlier `?count=N` was removed; not configurable without a code change.
