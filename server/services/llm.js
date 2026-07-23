@@ -24,69 +24,62 @@ Correct output fragment:
 ]}
 (ops is false because pop was not mentioned.)`;
 
+const MAX_ATTEMPTS = 3;
+const RETRYABLE_STATUS = new Set([429, 502, 503, 504]);
+
 function buildUserMessage(items) {
   return JSON.stringify({ questions: items });
 }
 
-/**
- * Azure OpenAI chat-completions call for batch-grading a submission in one
- * request. Talks only to Azure OpenAI - no Mongo/Express imports.
- */
-export async function gradeAnswers(items, { fetchImpl = fetch } = {}) {
-  const config = getAzureOpenAIConfig();
-  const url = `${config.endpoint}/openai/deployments/${config.deployment}/chat/completions?api-version=${config.version}`;
+function defaultSleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  console.log(`[llm] calling Azure OpenAI deployment=${config.deployment} questions=${items.length}`);
-  const startedAt = Date.now();
-  const response = await fetchImpl(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'api-key': config.key
-    },
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildUserMessage(items) }
-      ],
-      response_format: { type: 'json_object' }
-      // temperature intentionally omitted: some deployed models (e.g. gpt-5-nano)
-      // only support the default value (1) and reject an explicit temperature: 0.
-    })
-  });
+function backoffDelayMs(attempt) {
+  // attempt is 1-based index of the failed attempt → delay before next try
+  const base = 200 * 4 ** (attempt - 1);
+  const jitter = Math.floor(Math.random() * 101);
+  return base + jitter;
+}
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    console.error(`[llm] Azure OpenAI HTTP ${response.status} after ${Date.now() - startedAt}ms`);
-    throw new Error(`Azure OpenAI request failed with status ${response.status}: ${body}`);
+function createError(message, { status, retryable = false } = {}) {
+  const error = new Error(message);
+  if (status != null) {
+    error.status = status;
   }
+  error.retryable = retryable;
+  return error;
+}
 
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
-  console.log(`[llm] response received in ${Date.now() - startedAt}ms`);
-
-  if (!content) {
-    throw new Error('Azure OpenAI response is missing message content');
+function isRetryable(error) {
+  if (error?.retryable === true) {
+    return true;
   }
+  // Network / fetch failures (e.g. TypeError: fetch failed)
+  if (error instanceof TypeError) {
+    return true;
+  }
+  return false;
+}
 
+function parseGradingResults(content) {
   let parsed;
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new Error('Azure OpenAI response content was not valid JSON');
+    throw createError('Azure OpenAI response content was not valid JSON');
   }
 
   if (!Array.isArray(parsed.results)) {
-    throw new Error('Azure OpenAI response is missing a "results" array');
+    throw createError('Azure OpenAI response is missing a "results" array');
   }
 
-  console.log(`[llm] parsed ${parsed.results.length} result(s)`);
   return parsed.results.map((result, index) => {
     if (
       typeof result.questionId !== 'number' ||
       !Array.isArray(result.evaluations)
     ) {
-      throw new Error(`Azure OpenAI response has a malformed grading result at index ${index}`);
+      throw createError(`Azure OpenAI response has a malformed grading result at index ${index}`);
     }
 
     const evaluations = result.evaluations.map((evaluation, evalIndex) => {
@@ -95,7 +88,7 @@ export async function gradeAnswers(items, { fetchImpl = fetch } = {}) {
         typeof evaluation.quote !== 'string' ||
         typeof evaluation.satisfied !== 'boolean'
       ) {
-        throw new Error(
+        throw createError(
           `Azure OpenAI response has a malformed evaluation at result ${index}, evaluation ${evalIndex}`
         );
       }
@@ -111,4 +104,89 @@ export async function gradeAnswers(items, { fetchImpl = fetch } = {}) {
       evaluations
     };
   });
+}
+
+async function requestOnce(items, { fetchImpl, config, url }) {
+  const startedAt = Date.now();
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': config.key
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: buildUserMessage(items) }
+        ],
+        response_format: { type: 'json_object' }
+        // temperature intentionally omitted: some deployed models (e.g. gpt-5-nano)
+        // only support the default value (1) and reject an explicit temperature: 0.
+      })
+    });
+  } catch (error) {
+    error.retryable = true;
+    throw error;
+  }
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    console.error(`[llm] Azure OpenAI HTTP ${response.status} after ${Date.now() - startedAt}ms`);
+    throw createError(
+      `Azure OpenAI request failed with status ${response.status}: ${body}`,
+      {
+        status: response.status,
+        retryable: RETRYABLE_STATUS.has(response.status)
+      }
+    );
+  }
+
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content;
+  console.log(`[llm] response received in ${Date.now() - startedAt}ms`);
+
+  if (!content) {
+    throw createError('Azure OpenAI response is missing message content', {
+      retryable: true
+    });
+  }
+
+  const results = parseGradingResults(content);
+  console.log(`[llm] parsed ${results.length} result(s)`);
+  return results;
+}
+
+/**
+ * Azure OpenAI chat-completions call for batch-grading a submission in one
+ * request. Talks only to Azure OpenAI - no Mongo/Express imports.
+ * Retries transient failures (429/502/503/504, network, empty content) up to 3 times.
+ */
+export async function gradeAnswers(items, { fetchImpl = fetch, sleep = defaultSleep } = {}) {
+  const config = getAzureOpenAIConfig();
+  const url = `${config.endpoint}/openai/deployments/${config.deployment}/chat/completions?api-version=${config.version}`;
+
+  console.log(`[llm] calling Azure OpenAI deployment=${config.deployment} questions=${items.length}`);
+
+  let lastError;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await requestOnce(items, { fetchImpl, config, url });
+    } catch (error) {
+      lastError = error;
+      const willRetry = isRetryable(error) && attempt < MAX_ATTEMPTS;
+      console.error(
+        `[llm] attempt=${attempt}/${MAX_ATTEMPTS} failed: ${error.message} willRetry=${willRetry}`
+      );
+      if (!willRetry) {
+        throw error;
+      }
+      const delayMs = backoffDelayMs(attempt);
+      console.log(`[llm] backing off ${delayMs}ms before retry`);
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
 }
