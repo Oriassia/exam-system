@@ -1,0 +1,150 @@
+<mxfile host="app.diagrams.net" modified="2026-07-22T19:01:00.000Z" agent="Cursor" version="22.1.0" type="device">
+  <diagram id="submit-ep-flow" name="POST /submit">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="2200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="POST /submit — Auto-graded exam submission flow" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="560" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="subtitle" value="LLM judges binary rubric criteria only; the server computes all numeric scores." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="50" width="560" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="client" value="&lt;b&gt;1. Client submits exam&lt;/b&gt;&lt;br&gt;POST /submit&lt;br&gt;Body: { studentId, answers: [{ questionId, answer }] }&lt;br&gt;Typically 5 sampled questions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="160" y="90" width="340" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="client" target="validate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="validate" value="&lt;b&gt;2. Validate request&lt;/b&gt;&lt;br&gt;Is studentId present&lt;br&gt;AND answers a non-empty array?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="195" y="220" width="270" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e2bad" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="validate" target="res400a">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="res400a" value="&lt;b&gt;400 Bad Request&lt;/b&gt;&lt;br&gt;studentId and a non-empty&lt;br&gt;answers array are required" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="560" y="235" width="230" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e2ok" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="validate" target="fetchQ">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fetchQ" value="&lt;b&gt;3. Load questions + rubrics (MongoDB)&lt;/b&gt;&lt;br&gt;questions.find({ id: { $in: questionIds } })&lt;br&gt;Each question has structured rubric:&lt;br&gt;rubric.criteria[] = { id, description }&lt;br&gt;Binary criteria only (true/false), equal weight" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="160" y="370" width="340" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="fetchQ" target="hasQ">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="hasQ" value="&lt;b&gt;4. Found matching&lt;br&gt;questions?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="220" y="520" width="220" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e4bad" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="hasQ" target="res400b">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="res400b" value="&lt;b&gt;400 Bad Request&lt;/b&gt;&lt;br&gt;No matching questions found&lt;br&gt;for submitted answers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="560" y="535" width="230" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e4ok" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="hasQ" target="buildItems">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="buildItems" value="&lt;b&gt;5. Build grading payload (gradeSubmission)&lt;/b&gt;&lt;br&gt;• Drop answers with unknown questionId&lt;br&gt;• For each match, build item:&lt;br&gt;&amp;nbsp;&amp;nbsp;{ questionId, questionText, rubric, answer }&lt;br&gt;• Pass all items in one batch to the LLM client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="160" y="660" width="340" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="buildItems" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="llm" value="&lt;b&gt;6. LLM judges criteria — Azure OpenAI (1 call)&lt;/b&gt;&lt;br&gt;gradeAnswers(items) — single batched chat completion&lt;br&gt;&lt;br&gt;&lt;b&gt;Prompt rules (LLM-as-judge):&lt;/b&gt;&lt;br&gt;• For each criterion: quote evidence from the answer&lt;br&gt;&amp;nbsp;&amp;nbsp;(or quote = &quot;Missing&quot; if absent/incorrect)&lt;br&gt;• Then set satisfied: true | false (binary only)&lt;br&gt;• Do NOT output a numeric score — app does the math&lt;br&gt;• Few-shot example included in system prompt&lt;br&gt;&lt;br&gt;&lt;b&gt;Expected JSON per question:&lt;/b&gt;&lt;br&gt;{ questionId, evaluations: [&lt;br&gt;&amp;nbsp;&amp;nbsp;{ criterionId, quote, satisfied }&lt;br&gt;] }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="140" y="810" width="380" height="230" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="llm" target="validateLlm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="validateLlm" value="&lt;b&gt;7. Validate LLM response&lt;/b&gt;&lt;br&gt;• HTTP OK + parseable JSON&lt;br&gt;• results[] present&lt;br&gt;• Each evaluation has&lt;br&gt;&amp;nbsp;&amp;nbsp;criterionId (string),&lt;br&gt;&amp;nbsp;&amp;nbsp;quote (string),&lt;br&gt;&amp;nbsp;&amp;nbsp;satisfied (boolean)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="160" y="1080" width="340" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="validateLlm" target="gradeOk">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="gradeOk" value="&lt;b&gt;8. Grading&lt;br&gt;pipeline OK?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="220" y="1250" width="220" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e8bad" value="throw / fail&#10;(LLM error, bad JSON,&#10;missing criteria, etc.)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=10;align=left;" edge="1" parent="1" source="gradeOk" target="saveFail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="saveFail" value="&lt;b&gt;9a. Persist failure (MongoDB)&lt;/b&gt;&lt;br&gt;submissions.insertOne({&lt;br&gt;&amp;nbsp;&amp;nbsp;studentId, answers (raw),&lt;br&gt;&amp;nbsp;&amp;nbsp;status: &quot;grading_failed&quot;,&lt;br&gt;&amp;nbsp;&amp;nbsp;submittedAt&lt;br&gt;})&lt;br&gt;Raw answers are never lost" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="560" y="1230" width="260" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e8bad2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="saveFail" target="res502">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="res502" value="&lt;b&gt;502 Bad Gateway&lt;/b&gt;&lt;br&gt;Automatic grading failed&lt;br&gt;Returns submissionId for tracking" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="575" y="1410" width="230" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e8ok" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="gradeOk" target="matchCriteria">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="matchCriteria" value="&lt;b&gt;9b. Match evaluations to rubric (per question)&lt;/b&gt;&lt;br&gt;• Every rubric.criteria[].id must appear exactly once&lt;br&gt;• Reject unexpected / duplicate criterionIds&lt;br&gt;• Throw if any criterion is missing from LLM output" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1390" width="380" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="matchCriteria" target="score">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="score" value="&lt;b&gt;10. Compute scores in app code (not LLM)&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Per question:&lt;/b&gt;&lt;br&gt;• quality = satisfiedCount / criteria.length&lt;br&gt;&amp;nbsp;&amp;nbsp;(e.g. 2 of 4 criteria met → 0.5)&lt;br&gt;• maxScore = 100 / questionCount&lt;br&gt;&amp;nbsp;&amp;nbsp;(equal weight across questions; e.g. 5 Qs → 20 each)&lt;br&gt;• points = quality × maxScore&lt;br&gt;• display score = round(points, 1 decimal)&lt;br&gt;• feedback = deterministic text:&lt;br&gt;&amp;nbsp;&amp;nbsp;&quot;Met: …&quot; / &quot;Missing: …&quot; from criterion descriptions&lt;br&gt;&lt;br&gt;&lt;b&gt;Exam overall:&lt;/b&gt;&lt;br&gt;• overallScore = round(sum of unrounded points, 1 decimal)&lt;br&gt;• Perfect paper always totals exactly 100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1530" width="380" height="260" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="score" target="saveOk">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="saveOk" value="&lt;b&gt;11. Persist graded submission (MongoDB)&lt;/b&gt;&lt;br&gt;submissions.insertOne({&lt;br&gt;&amp;nbsp;&amp;nbsp;studentId,&lt;br&gt;&amp;nbsp;&amp;nbsp;answers: [{ questionId, answer, score, maxScore, feedback }],&lt;br&gt;&amp;nbsp;&amp;nbsp;overallScore,&lt;br&gt;&amp;nbsp;&amp;nbsp;status: &quot;graded&quot;,&lt;br&gt;&amp;nbsp;&amp;nbsp;submittedAt, gradedAt&lt;br&gt;})" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="160" y="1830" width="340" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="saveOk" target="res201">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="res201" value="&lt;b&gt;12. 201 Created&lt;/b&gt;&lt;br&gt;{ success: true, submissionId, submission }&lt;br&gt;Client shows overallScore / 100 + per-question feedback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;spacingRight=10;spacingTop=6;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="160" y="2020" width="340" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;Blue — client / request&lt;br&gt;Yellow — decision&lt;br&gt;Purple — MongoDB&lt;br&gt;Green — app grading logic / success&lt;br&gt;Orange — Azure OpenAI (criteria only)&lt;br&gt;Red — error response" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=10;spacingTop=6;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="560" y="90" width="260" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note" value="&lt;b&gt;Scoring example (5 questions)&lt;/b&gt;&lt;br&gt;maxScore per Q = 100/5 = 20&lt;br&gt;Q1: 3/4 criteria → 15 pts&lt;br&gt;Q2: 4/4 criteria → 20 pts&lt;br&gt;Q3: 1/3 criteria → 6.7 pts&lt;br&gt;…&lt;br&gt;overallScore = sum of points" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=10;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="560" y="1530" width="260" height="140" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,12 @@
+.history-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 30px;
+  color: #666;
+}
